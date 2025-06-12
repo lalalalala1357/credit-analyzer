@@ -92,11 +92,21 @@ if uploaded_file:
         for grade in sorted(df["年級"].unique(), key=lambda x: grade_order.get(x, 99)):
             group_df = df[df["年級"] == grade]
             with st.expander(f"▶️ {grade}"):
+                select_all_key = f"select_all_{grade}"
+                select_all = st.checkbox(f"全選 {grade} 課程", key=select_all_key)
+
+                checked_courses = {}
+
                 for idx, row in group_df.iterrows():
                     label = f"{row['課程名稱']} ({row['類別']}，{row['學分']} 學分)"
-                    checked = st.checkbox(label, key=f"course_{grade}_{idx}")
-                    if checked:
-                        selected_per_grade[grade].append(row)
+                    checked = st.checkbox(
+                        label,
+                        key=f"course_{grade}_{idx}",
+                        value=select_all
+                    )
+                    checked_courses[idx] = checked
+
+                selected_per_grade[grade] = [group_df.loc[idx] for idx, checked in checked_courses.items() if checked]
 
         st.subheader("📊 已選課程與學分統計（依學年分開）")
 
