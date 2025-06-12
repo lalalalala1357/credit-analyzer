@@ -85,7 +85,7 @@ if uploaded_file:
         df["年級排序"] = df["年級"].map(grade_order)
         df = df.sort_values("年級排序")
 
-        st.subheader("✅ 請勾選已修課程（依學年分類）")
+        st.subheader("✅ 請勾選已修課程")
 
         selected_per_grade = {grade: [] for grade in df["年級"].unique()}
 
