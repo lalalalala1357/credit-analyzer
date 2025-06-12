@@ -5,7 +5,6 @@ import re
 
 st.title("📚 學分分析工具（用學年分類）")
 
-# 🎓 畢業條件輸入
 st.sidebar.header("🎓 畢業學分要求設定")
 required_total = st.sidebar.number_input("畢業總學分", min_value=1, value=128)
 required_required = st.sidebar.number_input("必修學分", min_value=0, value=80)
@@ -14,18 +13,16 @@ required_elective = st.sidebar.number_input("選修學分", min_value=0, value=4
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
 grade_pattern = re.compile(r"第[一二三四五六七八九十]+學年")
-
-def detect_type(course_name):
-    if "博雅通識" in course_name:
-        return "博雅通識"
-    elif "必修" in course_name or "共同必修" in course_name:
+# 區段標題關鍵字判斷類別
+def detect_section_category(line):
+    if "共同必修" in line or "必修" in line:
         return "必修"
-    elif "選修" in course_name:
+    elif "選修" in line:
         return "選修"
-    elif "通識" in course_name:
-        return "通識"
+    elif "博雅通識" in line or "通識" in line:
+        return "博雅通識"
     else:
-        return "其他"
+        return None
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
@@ -38,6 +35,7 @@ if uploaded_file:
     lines = text.split("\n")
 
     current_grade = "未標示"
+    current_category = None
     data = []
 
     for line in lines:
@@ -45,16 +43,26 @@ if uploaded_file:
         if line == "":
             continue
 
+        # 判斷是否為學年標題
         grade_match = grade_pattern.search(line)
         if grade_match:
             current_grade = grade_match.group(0)
             continue
 
+        # 判斷是否為區段標題（改變當前類別）
+        section_category = detect_section_category(line)
+        if section_category is not None:
+            current_category = section_category
+            continue
+
+        # 如果是課程行，格式像：課程名稱 + 學分 + 數字 + 數字
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
-        if m:
+        if m and current_category is not None:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-            category = detect_type(course_name)
+
+            # 博雅通識學分同時也算作必修學分，在統計時可以特殊處理
+            category = current_category
 
             data.append({
                 "年級": current_grade,
@@ -110,7 +118,6 @@ if uploaded_file:
             df_all = pd.DataFrame(all_selected_rows)
 
             total_credits = df_all["學分"].sum()
-            # 博雅通識的學分也算作必修學分
             required_credits = df_all[df_all["類別"].isin(["必修", "博雅通識"])]["學分"].sum()
             elective_credits = df_all[df_all["類別"] == "選修"]["學分"].sum()
 
