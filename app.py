@@ -43,12 +43,12 @@ if uploaded_file:
             current_grade = f"第{year_num}學年"
             continue
 
-    # 判斷類別可以用課程名稱開頭或行內文字
+        # 判斷類別可以用課程名稱開頭或行內文字
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-        # 判斷類別
+            # 判斷類別
             if course_name.startswith("博雅通識"):
                 category = "博雅通識"
             elif "必修" in line:
@@ -60,13 +60,12 @@ if uploaded_file:
             else:
                 category = "其他"
 
-        data.append({
-            "年級": current_grade,
-            "類別": category,
-            "課程名稱": course_name,
-            "學分": credit,
-        })
-
+            data.append({
+                "年級": current_grade,
+                "類別": category,
+                "課程名稱": course_name,
+                "學分": credit,
+            })
 
     if data:
         df = pd.DataFrame(data)
@@ -88,9 +87,9 @@ if uploaded_file:
 
         any_selected = False
         for grade, rows in selected_per_grade.items():
+            st.markdown(f"### {grade}")
             if rows:
                 any_selected = True
-                st.markdown(f"### {grade}")
                 df_selected = pd.DataFrame(rows)
                 st.dataframe(df_selected)
 
@@ -98,7 +97,6 @@ if uploaded_file:
                 for _, r in summary.iterrows():
                     st.write(f"{r['類別']}: {r['學分']} 學分")
             else:
-                st.markdown(f"### {grade}")
                 st.info("尚無勾選課程")
 
         if not any_selected:
