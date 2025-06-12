@@ -61,26 +61,35 @@ if uploaded_file:
 
         st.subheader("✅ 請勾選已修課程（依學年分類）")
 
-        selected_rows = []
-        # 依年級分組，逐組輸出區塊
+        # 用 dict 紀錄每學年勾選課程
+        selected_per_grade = {grade: [] for grade in df["年級"].unique()}
+
         for grade, group_df in df.groupby("年級"):
             with st.expander(f"▶️ {grade}"):
                 for idx, row in group_df.iterrows():
                     label = f"{row['課程名稱']} ({row['類別']}，{row['學分']} 學分)"
                     checked = st.checkbox(label, key=f"course_{grade}_{idx}")
                     if checked:
-                        selected_rows.append(row)
+                        selected_per_grade[grade].append(row)
 
-        if selected_rows:
-            df_selected = pd.DataFrame(selected_rows)
-            st.subheader("📊 已選課程")
-            st.dataframe(df_selected)
+        st.subheader("📊 已選課程與學分統計（依學年分開）")
 
-            st.subheader("🎯 學分統計（依年級與類別）")
-            summary = df_selected.groupby(["年級", "類別"])["學分"].sum().reset_index()
-            for _, r in summary.iterrows():
-                st.write(f"{r['年級']} - {r['類別']}: {r['學分']} 學分")
-        else:
+        any_selected = False
+        for grade, rows in selected_per_grade.items():
+            if rows:
+                any_selected = True
+                st.markdown(f"### {grade}")
+                df_selected = pd.DataFrame(rows)
+                st.dataframe(df_selected)
+
+                summary = df_selected.groupby("類別")["學分"].sum().reset_index()
+                for _, r in summary.iterrows():
+                    st.write(f"{r['類別']}: {r['學分']} 學分")
+            else:
+                st.markdown(f"### {grade}")
+                st.info("尚無勾選課程")
+
+        if not any_selected:
             st.info("請勾選您已修課程以計算學分。")
 
     else:
