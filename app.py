@@ -34,6 +34,7 @@ if uploaded_file:
             continue
 
         # 根據區段標題判斷類別
+        # 類別判斷（保留博雅通識）
         if "共同必修" in line:
             current_type = "必修"
             continue
@@ -41,8 +42,7 @@ if uploaded_file:
             current_type = "必修"
             continue
         elif "博雅通識" in line:
-            # 博雅通識算必修
-            current_type = "必修"
+            current_type = "博雅通識"
             continue
         elif "選修" in line:
             current_type = "選修"
@@ -50,6 +50,7 @@ if uploaded_file:
         elif "通識" in line:
             current_type = "通識"
             continue
+
 
         # 偵測學年標題
         grade_match = grade_pattern.search(line)
