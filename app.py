@@ -3,7 +3,7 @@ import pdfplumber
 import pandas as pd
 import re
 
-st.title("📚 學分分析工具（用學年分類）")
+st.title("📚 學分分析工具")
 
 # 🎓 畢業條件輸入
 st.sidebar.header("🎓 畢業學分要求設定")
@@ -108,7 +108,7 @@ if uploaded_file:
 
                 selected_per_grade[grade] = [group_df.loc[idx] for idx, checked in checked_courses.items() if checked]
 
-        st.subheader("📊 已選課程與學分統計（依學年分開）")
+        st.subheader("📊 已修課程與學分統計")
 
         any_selected = False
         for grade, rows in selected_per_grade.items():
