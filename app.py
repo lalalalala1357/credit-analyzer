@@ -1,11 +1,34 @@
-import re
-import pandas as pd
 import streamlit as st
 import pdfplumber
+import pandas as pd
+import re
 
-st.title("📘 PDF 學分資料解析 - 自動分類")
+st.title("📚 課程學分分類分析工具（含子類別）")
 
-uploaded_file = st.file_uploader("請上傳 PDF", type="pdf")
+uploaded_file = st.file_uploader("請上傳學分 PDF", type="pdf")
+
+def detect_type_and_subtype(title):
+    # 判斷大類與子類（可根據你的標題關鍵字調整）
+    if "必修" in title:
+        if "核心" in title:
+            return "必修", "核心必修"
+        elif "專業" in title:
+            return "必修", "專業必修"
+        else:
+            return "必修", "一般必修"
+    elif "選修" in title or "學群" in title or "專業" in title:
+        if "核心" in title:
+            return "選修", "核心選修"
+        elif "專業" in title:
+            return "選修", "專業選修"
+        elif "一般" in title:
+            return "選修", "一般選修"
+        else:
+            return "選修", "其他選修"
+    elif "通識" in title:
+        return "通識", ""
+    else:
+        return "未分類", ""
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
@@ -15,71 +38,48 @@ if uploaded_file:
             if page_text:
                 text += page_text + "\n"
 
-    st.subheader("📄 PDF 原始內容")
-    st.text(text)
+    st.subheader("📄 PDF 文字內容預覽")
+    st.text_area("PDF內容", text, height=300)
 
-    # 處理課程資料
     lines = text.split("\n")
     data = []
-    current_category = None
-
-    def detect_type(cat_name):
-        """根據分類標題，自動判斷是必修 / 選修 / 通識"""
-        if "必修" in cat_name:
-            return "必修"
-        elif "選修" in cat_name or "學群" in cat_name or "專業" in cat_name:
-            return "選修"
-        elif "通識" in cat_name:
-            return "通識"
-        else:
-            return "未分類"
+    current_block = ""
 
     for line in lines:
         line = line.strip()
-        if re.match(r"^[\u4e00-\u9fa5A-Za-z（）\[\]\s]+$", line) and not re.search(r"\d", line):
-            current_category = line
+
+        # 判斷大標題（分類）
+        if re.search(r"(必修|選修|通識|學群|專業|核心)", line) and not re.search(r"\d", line):
+            current_block = line
             continue
 
-        match = re.match(r"(.+?)\s+(\d+)\s+(\d+)\s+(\d+)$", line)
+        # 課程行，忽略開頭 ● △ 空白符號
+        match = re.match(r"^[●△\s]*([\u4e00-\u9fa5A-Za-z0-9（）【】\[\]\-、&\s]+?)\s+(\d+)\s+(\d+)\s+(\d+)$", line)
         if match:
             course_name = match.group(1).strip()
             credit = int(match.group(2))
-            category = current_category or "未分類"
-            course_type = detect_type(category)
+            category, subtype = detect_type_and_subtype(current_block)
             data.append({
-                "類別": course_type,
-                "分類": category,
-                "課程": course_name,
+                "分類標題": current_block,
+                "類別": category,
+                "子類別": subtype,
+                "課程名稱": course_name,
                 "學分": credit
             })
 
     if data:
         df = pd.DataFrame(data)
-        st.subheader("📊 課程分類表")
+        st.subheader("📊 課程列表")
         st.dataframe(df)
 
-        st.markdown("### ✅ 各類別學分統計")
-        total_by_type = df.groupby("類別")["學分"].sum().to_dict()
-        total_required = {"必修": 30, "選修": 40, "通識": 20}
+        st.subheader("✅ 各類別與子類別學分統計")
+        total_by_type_subtype = df.groupby(["類別", "子類別"])["學分"].sum().reset_index()
 
-        for t in ["必修", "選修", "通識"]:
-            earned = total_by_type.get(t, 0)
-            required = total_required[t]
-            diff = required - earned
-            if diff <= 0:
-                st.success(f"✔️ {t} 已達標：{earned} / {required} 學分")
-            else:
-                st.warning(f"⚠️ {t} 尚缺：{diff} 學分（已修 {earned} / 需要 {required}）")
-
-        total_earned = df["學分"].sum()
-        total_required_sum = sum(total_required.values())
-        total_diff = total_required_sum - total_earned
-
-        st.markdown("### 🎯 總學分")
-        if total_diff <= 0:
-            st.success(f"🎉 已修總學分 {total_earned}，已達畢業門檻 {total_required_sum}！")
-        else:
-            st.info(f"目前總學分：{total_earned} / {total_required_sum}，還差 {total_diff} 學分")
+        for _, row in total_by_type_subtype.iterrows():
+            c = row["類別"]
+            s = row["子類別"]
+            earned = row["學分"]
+            st.write(f"{c} - {s}: {earned} 學分")
 
     else:
-        st.error("⚠️ 無法解析課程資料，請確認格式正確")
+        st.error("⚠️ 找不到可辨識的課程資訊，請確認PDF格式正確。")
