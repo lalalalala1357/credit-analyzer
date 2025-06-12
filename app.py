@@ -32,9 +32,9 @@ if uploaded_file:
     lines = text.split("\n")
 
     current_grade = "未標示"
-    current_category = "未分類"
     data = []
 
+    # 修正縮排，for loop 開頭不能多空格
     for line in lines:
         line = line.strip()
         grade_match = grade_pattern.search(line)
@@ -43,22 +43,14 @@ if uploaded_file:
             current_grade = f"第{year_num}學年"
             continue
 
-        # 判斷類別可以用課程名稱開頭或行內文字
+        # 用正則抓課程名稱和學分等
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-            # 判斷類別
-            if course_name.startswith("博雅通識"):
-                category = "博雅通識"
-            elif "必修" in line:
-                category = "必修"
-            elif "選修" in line:
-                category = "選修"
-            elif "通識" in line:
-                category = "通識"
-            else:
-                category = "其他"
+
+            # 判斷類別優先用函式，也可加更多邏輯
+            category = detect_type(line)
 
             data.append({
                 "年級": current_grade,
@@ -70,12 +62,26 @@ if uploaded_file:
     if data:
         df = pd.DataFrame(data)
 
+        # 學年排序對照表
+        grade_order = {
+            "第一學年": 1,
+            "第二學年": 2,
+            "第三學年": 3,
+            "第四學年": 4,
+            "未標示": 5
+        }
+
+        # 新增排序欄位並排序
+        df["年級排序"] = df["年級"].map(grade_order)
+        df = df.sort_values("年級排序")
+
         st.subheader("✅ 請勾選已修課程（依學年分類）")
 
-        # 用 dict 紀錄每學年勾選課程
         selected_per_grade = {grade: [] for grade in df["年級"].unique()}
 
-        for grade, group_df in df.groupby("年級"):
+        # 按照排序過的年級依序顯示
+        for grade in sorted(df["年級"].unique(), key=lambda x: grade_order.get(x, 99)):
+            group_df = df[df["年級"] == grade]
             with st.expander(f"▶️ {grade}"):
                 for idx, row in group_df.iterrows():
                     label = f"{row['課程名稱']} ({row['類別']}，{row['學分']} 學分)"
