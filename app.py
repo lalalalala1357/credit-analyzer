@@ -52,6 +52,7 @@ if uploaded_file:
     }
 
     # 以下是學分統計（和前面版本類似）
+    import pandas as pd
     lines = text.strip().split("\n")
     data = []
 
