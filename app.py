@@ -35,7 +35,7 @@ if uploaded_file:
     current_category = "未分類"
     data = []
 
-   for line in lines:
+for line in lines:
     line = line.strip()
     grade_match = grade_pattern.search(line)
     if grade_match:
