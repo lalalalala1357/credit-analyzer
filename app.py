@@ -5,6 +5,12 @@ import re
 
 st.title("📚 學分分析工具（用學年分類）")
 
+# 🎓 畢業條件輸入
+st.sidebar.header("🎓 畢業學分要求設定")
+required_total = st.sidebar.number_input("畢業總學分", min_value=1, value=128)
+required_required = st.sidebar.number_input("必修學分", min_value=0, value=80)
+required_elective = st.sidebar.number_input("選修學分", min_value=0, value=48)
+
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
 grade_pattern = re.compile(r"第(一|二|三|四)學年")
@@ -34,7 +40,6 @@ if uploaded_file:
     current_grade = "未標示"
     data = []
 
-    # 修正縮排，for loop 開頭不能多空格
     for line in lines:
         line = line.strip()
         grade_match = grade_pattern.search(line)
@@ -43,13 +48,10 @@ if uploaded_file:
             current_grade = f"第{year_num}學年"
             continue
 
-        # 用正則抓課程名稱和學分等
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-
-            # 判斷類別優先用函式，也可加更多邏輯
             category = detect_type(line)
 
             data.append({
@@ -62,7 +64,6 @@ if uploaded_file:
     if data:
         df = pd.DataFrame(data)
 
-        # 學年排序對照表
         grade_order = {
             "第一學年": 1,
             "第二學年": 2,
@@ -71,7 +72,6 @@ if uploaded_file:
             "未標示": 5
         }
 
-        # 新增排序欄位並排序
         df["年級排序"] = df["年級"].map(grade_order)
         df = df.sort_values("年級排序")
 
@@ -79,7 +79,6 @@ if uploaded_file:
 
         selected_per_grade = {grade: [] for grade in df["年級"].unique()}
 
-        # 按照排序過的年級依序顯示
         for grade in sorted(df["年級"].unique(), key=lambda x: grade_order.get(x, 99)):
             group_df = df[df["年級"] == grade]
             with st.expander(f"▶️ {grade}"):
@@ -105,7 +104,24 @@ if uploaded_file:
             else:
                 st.info("尚無勾選課程")
 
-        if not any_selected:
+        # 🎯 畢業條件總覽
+        all_selected_rows = [row for rows in selected_per_grade.values() for row in rows]
+        if all_selected_rows:
+            df_all = pd.DataFrame(all_selected_rows)
+
+            total_credits = df_all["學分"].sum()
+            required_credits = df_all[df_all["類別"] == "必修"]["學分"].sum()
+            elective_credits = df_all[df_all["類別"] == "選修"]["學分"].sum()
+
+            st.subheader("🎯 畢業條件達成檢查")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("總學分", f"{total_credits} / {required_total}",
+                        "✅" if total_credits >= required_total else "❌")
+            col2.metric("必修學分", f"{required_credits} / {required_required}",
+                        "✅" if required_credits >= required_required else "❌")
+            col3.metric("選修學分", f"{elective_credits} / {required_elective}",
+                        "✅" if elective_credits >= required_elective else "❌")
+        else:
             st.info("請勾選您已修課程以計算學分。")
 
     else:
