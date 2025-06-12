@@ -1,93 +1,57 @@
+import re
+import pandas as pd
 import streamlit as st
 import pdfplumber
-import re
 
-st.title("📚 學分分析小幫手 V4 - 自動偵測 + 手動設定畢業門檻")
+st.title("📘 PDF 學分資料解析")
 
-uploaded_file = st.file_uploader("請上傳學分計畫表 PDF", type="pdf")
-
-REQUIRED_CREDITS_DEFAULT = {
-    "必修": 30,
-    "選修": 40,
-    "通識": 20,
-}
+uploaded_file = st.file_uploader("請上傳 PDF", type="pdf")
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
         text = ""
         for page in pdf.pages:
-            text += page.extract_text() + "\n"
-    st.subheader("PDF 內容預覽")
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+
+    st.subheader("📄 PDF 原始內容")
     st.text(text)
 
-    # 自動偵測門檻
-    detected_credits = {}
-
-    for line in text.split("\n"):
-        # 例：必修需修學分：30、必修畢業門檻 30、選修 40 等等
-        match = re.search(r"(必修|選修|通識).*?(?:需修學分|畢業門檻|門檻)?[:：]?\s*(\d+)", line)
-        if match:
-            category, credit = match.groups()
-            detected_credits[category] = int(credit)
-
-    st.markdown("### 📊 自動偵測到的畢業門檻（可修改）")
-
-    # 用偵測到的值填入輸入框，沒偵測到用預設值
-    required_mandatory = st.number_input(
-        "必修學分門檻", value=detected_credits.get("必修", REQUIRED_CREDITS_DEFAULT["必修"])
-    )
-    required_elective = st.number_input(
-        "選修學分門檻", value=detected_credits.get("選修", REQUIRED_CREDITS_DEFAULT["選修"])
-    )
-    required_general = st.number_input(
-        "通識學分門檻", value=detected_credits.get("通識", REQUIRED_CREDITS_DEFAULT["通識"])
-    )
-
-    REQUIRED_CREDITS = {
-        "必修": required_mandatory,
-        "選修": required_elective,
-        "通識": required_general,
-    }
-
-    # 以下是學分統計（和前面版本類似）
-    import pandas as pd
-    lines = text.strip().split("\n")
+    # 處理課程資料
+    lines = text.split("\n")
     data = []
+    current_category = None  # 當前分類區塊
 
     for line in lines:
-    # 課名 學分 類別（例如：計算機概論 3 必修）
-        match = re.match(r"(.+?)\s+(\d+)\s+(必修|選修|通識)", line)
-        if match:
-            course, credit, category = match.groups()
-            data.append({"類別": category, "課程": course, "學分": int(credit)})
+        line = line.strip()
+        # 如果這一行看起來像是分類標題（不含數字，但又很像標題）
+        if re.match(r"^[\u4e00-\u9fa5A-Za-z（）\[\]\s]+$", line) and not re.search(r"\d", line):
+            current_category = line
+            continue
 
+        # 偵測課程格式（結尾有 3 個數字）
+        match = re.match(r"(.+?)\s+(\d+)\s+(\d+)\s+(\d+)$", line)
+        if match:
+            course_name = match.group(1).strip()
+            credit = int(match.group(2))
+            data.append({
+                "分類": current_category or "未分類",
+                "課程": course_name,
+                "學分": credit
+            })
 
     if data:
-        st.subheader("📊 課程分類與學分統計")
         df = pd.DataFrame(data)
+        st.subheader("📊 課程表")
         st.dataframe(df)
 
-        total_by_type = df.groupby("類別")["學分"].sum().to_dict()
+        st.markdown("### ✅ 各分類學分總計")
+        total_by_category = df.groupby("分類")["學分"].sum()
+        for category, total in total_by_category.items():
+            st.write(f"📌 {category}：{total} 學分")
 
-        st.markdown("### ✅ 各類別學分統計")
-        for category, required in REQUIRED_CREDITS.items():
-            earned = total_by_type.get(category, 0)
-            diff = required - earned
-            if diff <= 0:
-                st.success(f"✔️ {category} 已達標：{earned} / {required} 學分")
-            else:
-                st.warning(f"⚠️ {category} 尚缺：{diff} 學分（已修 {earned} / 需要 {required}）")
+        st.success(f"🎯 總學分：{df['學分'].sum()}")
 
-        st.markdown("### 🎯 總結")
-        total_required = sum(REQUIRED_CREDITS.values())
-        total_earned = sum(df["學分"])
-        total_diff = total_required - total_earned
-
-        if total_diff <= 0:
-            st.success(f"🎉 已修總學分 {total_earned}，已達畢業門檻 {total_required}！")
-        else:
-            st.info(f"目前總學分：{total_earned} / {total_required}，還差 {total_diff} 學分")
     else:
-        st.error("⚠️ 找不到可辨識的課程資訊，請確認 PDF 格式正確（如：'必修 國文 2'）")
-
-
+        st.warning("⚠️ 無法解析課程內容，請檢查格式")
