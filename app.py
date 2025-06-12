@@ -14,6 +14,8 @@ def detect_type(line):
         return "必修"
     elif "選修" in line:
         return "選修"
+    elif "博雅通識" in line:
+        return "博雅通識"
     elif "通識" in line:
         return "通識"
     else:
