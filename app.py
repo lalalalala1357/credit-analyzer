@@ -35,30 +35,30 @@ if uploaded_file:
     current_category = "未分類"
     data = []
 
-for line in lines:
-    line = line.strip()
-    grade_match = grade_pattern.search(line)
-    if grade_match:
-        year_num = grade_match.group(1)
-        current_grade = f"第{year_num}學年"
-        continue
+    for line in lines:
+        line = line.strip()
+        grade_match = grade_pattern.search(line)
+        if grade_match:
+            year_num = grade_match.group(1)
+            current_grade = f"第{year_num}學年"
+            continue
 
     # 判斷類別可以用課程名稱開頭或行內文字
-    m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
-    if m:
-        course_name = m.group(1).strip("●△ ")
-        credit = int(m.group(2))
+        m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
+        if m:
+            course_name = m.group(1).strip("●△ ")
+            credit = int(m.group(2))
         # 判斷類別
-        if course_name.startswith("博雅通識"):
-            category = "博雅通識"
-        elif "必修" in line:
-            category = "必修"
-        elif "選修" in line:
-            category = "選修"
-        elif "通識" in line:
-            category = "通識"
-        else:
-            category = "其他"
+            if course_name.startswith("博雅通識"):
+                category = "博雅通識"
+            elif "必修" in line:
+                category = "必修"
+            elif "選修" in line:
+                category = "選修"
+            elif "通識" in line:
+                category = "通識"
+            else:
+                category = "其他"
 
         data.append({
             "年級": current_grade,
