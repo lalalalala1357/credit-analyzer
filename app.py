@@ -1,7 +1,6 @@
 import streamlit as st
 import pdfplumber
 import re
-import pandas as pd
 
 st.title("📚 學分分析小幫手 V4 - 自動偵測 + 手動設定畢業門檻")
 
@@ -18,9 +17,8 @@ if uploaded_file:
         text = ""
         for page in pdf.pages:
             text += page.extract_text() + "\n"
-
     st.subheader("PDF 內容預覽")
-    st.text(text[:1500])
+    st.text(text)
 
     # 自動偵測門檻
     detected_credits = {}
@@ -57,11 +55,12 @@ if uploaded_file:
     data = []
 
     for line in lines:
-        # 新格式：課程名稱 學分 類別（例：資料結構 3 必修）
+    # 課名 學分 類別（例如：計算機概論 3 必修）
         match = re.match(r"(.+?)\s+(\d+)\s+(必修|選修|通識)", line)
         if match:
             course, credit, category = match.groups()
             data.append({"類別": category, "課程": course, "學分": int(credit)})
+
 
     if data:
         st.subheader("📊 課程分類與學分統計")
@@ -90,3 +89,5 @@ if uploaded_file:
             st.info(f"目前總學分：{total_earned} / {total_required}，還差 {total_diff} 學分")
     else:
         st.error("⚠️ 找不到可辨識的課程資訊，請確認 PDF 格式正確（如：'必修 國文 2'）")
+
+
