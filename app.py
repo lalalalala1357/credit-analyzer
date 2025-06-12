@@ -7,12 +7,6 @@ st.title("📚 學分分析工具（用學年分類）")
 
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
-REQUIRED_CREDITS_DEFAULT = {
-    "必修": 30,
-    "選修": 40,
-    "通識": 20,
-}
-
 grade_pattern = re.compile(r"第(一|二|三|四)學年")
 
 def detect_type(line):
@@ -37,12 +31,10 @@ if uploaded_file:
 
     current_grade = "未標示"
     current_category = "未分類"
-
     data = []
+
     for line in lines:
         line = line.strip()
-
-        # 抓學年，只限定1-4學年
         grade_match = grade_pattern.search(line)
         if grade_match:
             year_num = grade_match.group(1)
@@ -57,7 +49,6 @@ if uploaded_file:
         if m:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-
             data.append({
                 "年級": current_grade,
                 "類別": current_category,
@@ -68,13 +59,17 @@ if uploaded_file:
     if data:
         df = pd.DataFrame(data)
 
-        st.subheader("✅ 請勾選已修課程")
+        st.subheader("✅ 請勾選已修課程（依學年分類）")
+
         selected_rows = []
-        for idx, row in df.iterrows():
-            label = f"{row['課程名稱']} ({row['年級']} - {row['類別']}，{row['學分']} 學分)"
-            checked = st.checkbox(label, key=f"course_{idx}")
-            if checked:
-                selected_rows.append(row)
+        # 依年級分組，逐組輸出區塊
+        for grade, group_df in df.groupby("年級"):
+            with st.expander(f"▶️ {grade}"):
+                for idx, row in group_df.iterrows():
+                    label = f"{row['課程名稱']} ({row['類別']}，{row['學分']} 學分)"
+                    checked = st.checkbox(label, key=f"course_{grade}_{idx}")
+                    if checked:
+                        selected_rows.append(row)
 
         if selected_rows:
             df_selected = pd.DataFrame(selected_rows)
