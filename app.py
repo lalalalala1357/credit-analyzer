@@ -5,6 +5,7 @@ import re
 
 st.title("📚 學分分析工具（用學年分類）")
 
+# 畢業條件輸入
 st.sidebar.header("🎓 畢業學分要求設定")
 required_total = st.sidebar.number_input("畢業總學分", min_value=1, value=128)
 required_required = st.sidebar.number_input("必修學分", min_value=0, value=80)
@@ -34,7 +35,6 @@ if uploaded_file:
             continue
 
         # 根據區段標題判斷類別
-        # 類別判斷（保留博雅通識）
         if "共同必修" in line:
             current_type = "必修"
             continue
@@ -51,14 +51,13 @@ if uploaded_file:
             current_type = "通識"
             continue
 
-
         # 偵測學年標題
         grade_match = grade_pattern.search(line)
         if grade_match:
             current_grade = grade_match.group(0)
             continue
 
-        # 解析課程行
+        # 解析課程行（課名 學分 其他 其他）
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m:
             course_name = m.group(1).strip("●△ ")
@@ -117,7 +116,8 @@ if uploaded_file:
             df_all = pd.DataFrame(all_selected_rows)
 
             total_credits = df_all["學分"].sum()
-            required_credits = df_all[df_all["類別"] == "必修"]["學分"].sum()
+            # 博雅通識的學分也納入必修學分計算
+            required_credits = df_all[df_all["類別"].isin(["必修", "博雅通識"])]["學分"].sum()
             elective_credits = df_all[df_all["類別"] == "選修"]["學分"].sum()
 
             st.subheader("🎯 畢業條件達成檢查")
@@ -133,4 +133,3 @@ if uploaded_file:
 
     else:
         st.error("找不到可辨識的課程資訊，請確認 PDF 格式。")
-
