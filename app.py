@@ -3,12 +3,11 @@ import pdfplumber
 import pandas as pd
 import re
 
-st.title("📚 課程學分分類分析工具（含子類別）")
+st.title("📚 課程學分分類分析工具（含子類別 + 自選課程勾選）")
 
 uploaded_file = st.file_uploader("請上傳學分 PDF", type="pdf")
 
 def detect_type_and_subtype(title):
-    # 判斷大類與子類（可根據你的標題關鍵字調整）
     if "必修" in title:
         if "核心" in title:
             return "必修", "核心必修"
@@ -53,7 +52,6 @@ if uploaded_file:
             current_block = line
             continue
 
-        # 課程行，忽略開頭 ● △ 空白符號
         match = re.match(r"^[●△\s]*([\u4e00-\u9fa5A-Za-z0-9（）【】\[\]\-、&\s]+?)\s+(\d+)\s+(\d+)\s+(\d+)$", line)
         if match:
             course_name = match.group(1).strip()
@@ -69,17 +67,31 @@ if uploaded_file:
 
     if data:
         df = pd.DataFrame(data)
-        st.subheader("📊 課程列表")
-        st.dataframe(df)
 
-        st.subheader("✅ 各類別與子類別學分統計")
-        total_by_type_subtype = df.groupby(["類別", "子類別"])["學分"].sum().reset_index()
+        st.subheader("✅ 請勾選您已修過的課程")
+        selected = []
+        for idx, row in df.iterrows():
+            label = f"{row['課程名稱']} ({row['類別']} - {row['子類別']}，{row['學分']} 學分)"
+            checked = st.checkbox(label, key=f"course_{idx}")
+            if checked:
+                selected.append(row)
 
-        for _, row in total_by_type_subtype.iterrows():
-            c = row["類別"]
-            s = row["子類別"]
-            earned = row["學分"]
-            st.write(f"{c} - {s}: {earned} 學分")
+        if selected:
+            df_selected = pd.DataFrame(selected)
+            st.subheader("📊 您選擇的課程")
+            st.dataframe(df_selected)
+
+            # 計算選擇課程的學分統計
+            total_by_type_subtype = df_selected.groupby(["類別", "子類別"])["學分"].sum().reset_index()
+
+            st.subheader("🎯 您的學分統計")
+            for _, row in total_by_type_subtype.iterrows():
+                c = row["類別"]
+                s = row["子類別"]
+                earned = row["學分"]
+                st.write(f"{c} - {s}: {earned} 學分")
+        else:
+            st.info("請勾選您已修過的課程以計算學分。")
 
     else:
         st.error("⚠️ 找不到可辨識的課程資訊，請確認PDF格式正確。")
