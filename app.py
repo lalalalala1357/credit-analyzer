@@ -5,6 +5,7 @@ import re
 
 st.title("📚 學分分析工具（用學年分類）")
 
+# 🎓 畢業條件輸入
 st.sidebar.header("🎓 畢業學分要求設定")
 required_total = st.sidebar.number_input("畢業總學分", min_value=1, value=128)
 required_required = st.sidebar.number_input("必修學分", min_value=0, value=80)
@@ -12,15 +13,18 @@ required_elective = st.sidebar.number_input("選修學分", min_value=0, value=4
 
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
-grade_pattern = re.compile(r"第[一二三四五六七八九十]+學年")
-# 區段標題關鍵字判斷類別
+grade_pattern = re.compile(r"第(一|二|三|四)學年")
+
 def detect_section_category(line):
+    line = line.strip()
     if "共同必修" in line or "必修" in line:
         return "必修"
     elif "選修" in line:
         return "選修"
-    elif "博雅通識" in line or "通識" in line:
+    elif "博雅" in line:
         return "博雅通識"
+    elif "通識" in line:
+        return "通識"
     else:
         return None
 
@@ -35,34 +39,30 @@ if uploaded_file:
     lines = text.split("\n")
 
     current_grade = "未標示"
-    current_category = None
+    current_section = None
     data = []
 
     for line in lines:
         line = line.strip()
-        if line == "":
-            continue
-
-        # 判斷是否為學年標題
+        # 判斷學年
         grade_match = grade_pattern.search(line)
         if grade_match:
-            current_grade = grade_match.group(0)
+            year_num = grade_match.group(1)
+            current_grade = f"第{year_num}學年"
             continue
 
-        # 判斷是否為區段標題（改變當前類別）
+        # 判斷區段類別（必修、選修、博雅通識...）
         section_category = detect_section_category(line)
-        if section_category is not None:
-            current_category = section_category
+        if section_category:
+            current_section = section_category
             continue
 
-        # 如果是課程行，格式像：課程名稱 + 學分 + 數字 + 數字
+        # 解析課程資料行
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
-        if m and current_category is not None:
+        if m and current_section:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-
-            # 博雅通識學分同時也算作必修學分，在統計時可以特殊處理
-            category = current_category
+            category = current_section
 
             data.append({
                 "年級": current_grade,
@@ -81,7 +81,8 @@ if uploaded_file:
             "第四學年": 4,
             "未標示": 5
         }
-        df["年級排序"] = df["年級"].map(grade_order).fillna(99).astype(int)
+
+        df["年級排序"] = df["年級"].map(grade_order)
         df = df.sort_values("年級排序")
 
         st.subheader("✅ 請勾選已修課程（依學年分類）")
@@ -113,11 +114,13 @@ if uploaded_file:
             else:
                 st.info("尚無勾選課程")
 
+        # 🎯 畢業條件總覽
         all_selected_rows = [row for rows in selected_per_grade.values() for row in rows]
         if all_selected_rows:
             df_all = pd.DataFrame(all_selected_rows)
 
             total_credits = df_all["學分"].sum()
+            # 必修學分計算時包含博雅通識
             required_credits = df_all[df_all["類別"].isin(["必修", "博雅通識"])]["學分"].sum()
             elective_credits = df_all[df_all["類別"] == "選修"]["學分"].sum()
 
