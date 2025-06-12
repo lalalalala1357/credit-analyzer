@@ -14,18 +14,21 @@ required_elective = st.sidebar.number_input("選修學分", min_value=0, value=4
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
 grade_pattern = re.compile(r"第(一|二|三|四)學年")
-section_title_keywords = {
-    "必修": ["共同必修", "必修"],
-    "選修": ["選修"],
-    "博雅通識": ["博雅", "博雅通識", "博雅類", "博雅選修"],
-    "通識": ["通識"]
-}
 
-def detect_type_from_section(title):
-    for key, keywords in section_title_keywords.items():
-        if any(kw in title for kw in keywords):
-            return key
-    return "其他"
+# 用來判斷區段分類（例如：共同必修科目、選修...）
+section_type = "其他"
+
+def detect_type(line, course_name):
+    if "博雅" in line or "博雅" in course_name:
+        return "博雅通識"
+    elif "必修" in section_type:
+        return "必修"
+    elif "選修" in section_type:
+        return "選修"
+    elif "通識" in section_type:
+        return "通識"
+    else:
+        return "其他"
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
@@ -38,35 +41,28 @@ if uploaded_file:
     lines = text.split("\n")
 
     current_grade = "未標示"
-    current_section = ""
     data = []
 
     for line in lines:
         line = line.strip()
 
-        if not line:
-            continue
-
+        # 偵測學年
         grade_match = grade_pattern.search(line)
         if grade_match:
             year_num = grade_match.group(1)
             current_grade = f"第{year_num}學年"
             continue
 
-        if "科目" in line or "課程" in line:
-            current_section = line
-            continue
+        # 更新區段類型（例如：共同必修科目、博雅通識課程等）
+        if any(keyword in line for keyword in ["必修", "選修", "通識", "博雅"]):
+            section_type = line
 
+        # 抓取課程資料
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-
-            # 🧠 類別推斷邏輯：優先看課程名中是否有 "博雅"
-            if "博雅" in course_name and not any(x in course_name for x in ["體育", "軍事"]):
-                category = "博雅通識"
-            else:
-                category = detect_type_from_section(current_section)
+            category = detect_type(line, course_name)
 
             data.append({
                 "年級": current_grade,
@@ -118,6 +114,7 @@ if uploaded_file:
             else:
                 st.info("尚無勾選課程")
 
+        # 🎯 畢業條件總覽
         all_selected_rows = [row for rows in selected_per_grade.values() for row in rows]
         if all_selected_rows:
             df_all = pd.DataFrame(all_selected_rows)
@@ -138,4 +135,3 @@ if uploaded_file:
             st.info("請勾選您已修課程以計算學分。")
     else:
         st.error("找不到可辨識的課程資訊，請確認 PDF 格式。")
-
