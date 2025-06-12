@@ -54,10 +54,12 @@ if uploaded_file:
     lines = text.strip().split("\n")
     data = []
     for line in lines:
-        match = re.match(r"(必修|選修|通識)\s+(\S+)\s+(\d+)", line)
-        if match:
-            category, course, credit = match.groups()
-            data.append({"類別": category, "課程": course, "學分": int(credit)})
+    # 新格式：課程名稱 學分 類別（例：資料結構 3 必修）
+    match = re.match(r"(.+?)\s+(\d+)\s+(必修|選修|通識)", line)
+    if match:
+        course, credit, category = match.groups()
+        data.append({"類別": category, "課程": course, "學分": int(credit)})
+
 
     if data:
         st.subheader("📊 課程分類與學分統計")
