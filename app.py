@@ -8,25 +8,35 @@ st.title("📚 學分分析工具（用學年分類）")
 # 🎓 畢業條件輸入
 st.sidebar.header("🎓 畢業學分要求設定")
 required_total = st.sidebar.number_input("畢業總學分", min_value=1, value=128)
-required_required = st.sidebar.number_input("必修學分", min_value=0, value=80)
+required_required = st.sidebar.number_input("必修學分（含博雅）", min_value=0, value=80)
 required_elective = st.sidebar.number_input("選修學分", min_value=0, value=48)
 
 uploaded_file = st.file_uploader("請上傳學分計畫 PDF", type="pdf")
 
+# 判斷學年區段
 grade_pattern = re.compile(r"第(一|二|三|四)學年")
 
-def detect_section_category(line):
-    line = line.strip()
-    if "共同必修" in line or "必修" in line:
-        return "必修"
-    elif "選修" in line:
-        return "選修"
-    elif "博雅" in line:
+# 根據區段標題決定課程初步類別
+def detect_section_category(section_title):
+    section_title = section_title.lower()
+    if "博雅" in section_title:
         return "博雅通識"
-    elif "通識" in line:
+    elif "通識" in section_title:
         return "通識"
+    elif "選修" in section_title:
+        return "選修"
+    elif "必修" in section_title:
+        return "必修"
     else:
-        return None
+        return "其他"
+
+# 根據課名進行覆寫分類（避免體育歸錯類）
+def detect_course_override(course_name, current_section):
+    if "體育" in course_name:
+        return "體育"
+    if "軍事訓練" in course_name or "國防" in course_name:
+        return "其他"
+    return current_section
 
 if uploaded_file:
     with pdfplumber.open(uploaded_file) as pdf:
@@ -44,6 +54,9 @@ if uploaded_file:
 
     for line in lines:
         line = line.strip()
+        if not line:
+            continue
+
         # 判斷學年
         grade_match = grade_pattern.search(line)
         if grade_match:
@@ -51,18 +64,17 @@ if uploaded_file:
             current_grade = f"第{year_num}學年"
             continue
 
-        # 判斷區段類別（必修、選修、博雅通識...）
-        section_category = detect_section_category(line)
-        if section_category:
-            current_section = section_category
+        # 判斷區段標題
+        if any(keyword in line for keyword in ["必修", "選修", "通識", "博雅"]):
+            current_section = detect_section_category(line)
             continue
 
-        # 解析課程資料行
+        # 課程行
         m = re.match(r"^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)", line)
         if m and current_section:
             course_name = m.group(1).strip("●△ ")
             credit = int(m.group(2))
-            category = current_section
+            category = detect_course_override(course_name, current_section)
 
             data.append({
                 "年級": current_grade,
@@ -74,6 +86,7 @@ if uploaded_file:
     if data:
         df = pd.DataFrame(data)
 
+        # 排序學年
         grade_order = {
             "第一學年": 1,
             "第二學年": 2,
@@ -86,7 +99,6 @@ if uploaded_file:
         df = df.sort_values("年級排序")
 
         st.subheader("✅ 請勾選已修課程（依學年分類）")
-
         selected_per_grade = {grade: [] for grade in df["年級"].unique()}
 
         for grade in sorted(df["年級"].unique(), key=lambda x: grade_order.get(x, 99)):
@@ -99,8 +111,8 @@ if uploaded_file:
                         selected_per_grade[grade].append(row)
 
         st.subheader("📊 已選課程與學分統計（依學年分開）")
-
         any_selected = False
+
         for grade, rows in selected_per_grade.items():
             st.markdown(f"### {grade}")
             if rows:
@@ -120,7 +132,6 @@ if uploaded_file:
             df_all = pd.DataFrame(all_selected_rows)
 
             total_credits = df_all["學分"].sum()
-            # 必修學分計算時包含博雅通識
             required_credits = df_all[df_all["類別"].isin(["必修", "博雅通識"])]["學分"].sum()
             elective_credits = df_all[df_all["類別"] == "選修"]["學分"].sum()
 
@@ -128,7 +139,7 @@ if uploaded_file:
             col1, col2, col3 = st.columns(3)
             col1.metric("總學分", f"{total_credits} / {required_total}",
                         "✅" if total_credits >= required_total else "❌")
-            col2.metric("必修學分", f"{required_credits} / {required_required}",
+            col2.metric("必修學分（含博雅）", f"{required_credits} / {required_required}",
                         "✅" if required_credits >= required_required else "❌")
             col3.metric("選修學分", f"{elective_credits} / {required_elective}",
                         "✅" if elective_credits >= required_elective else "❌")
@@ -137,4 +148,3 @@ if uploaded_file:
 
     else:
         st.error("找不到可辨識的課程資訊，請確認 PDF 格式。")
-
