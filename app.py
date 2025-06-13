@@ -34,6 +34,9 @@ def detect_type(line, course_name):
 def generate_pdf(dataframe):
     pdf = FPDF()
     pdf.add_page()
+    pdf.add_font("NotoSansTC", "", "fonts/NotoSansTC-Regular.ttf", uni=True)
+    pdf.set_font("NotoSansTC", size=12)
+
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, txt="已修課程報告", ln=True, align="C")
     pdf.ln(10)
